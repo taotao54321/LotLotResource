@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>ロットロット (FC) 攻略/解析 - wave</title>
+
+    <link rel="stylesheet" href="/asset/css/main.css">
+</head>
+<body>
+
+<header><a href="../">ロットロット (FC) 攻略/解析</a></header>
+
+<h1>wave</h1>
+
+<p>"wave" とは、規定のタイミングで壁開けまたは赤玉生成を行う指示の列を意味する。</p>
+
+<p>wave 内の単位時間を「wave 内時間」と呼ぶ。wave 内時間はターン管理用短周期カウンタ (mod 8) が 0 になるたびにインクリメントされ、結果がオーバーフローして 0 になったら次の wave へ進む。</p>
+
+<p>ゲーム内には 40 個の wave が存在し、最後の wave が終了したら最初に戻る。なお、重複を除くと wave は全 28 種類ある。</p>
+
+<p>参考: <a href="https://www.nicovideo.jp/watch/sm44551280">全 wave を可視化した動画</a> (<a href="https://gist.github.com/taotao54321/f8e404c52a8212a4ad189f56564ea0ff">movie および関連スクリプト</a>)</p>
+
+<h2>wave データ</h2>
+
+<p>wave データは以下の要素の配列 (<code>0xFF</code> 終端):</p>
+
+<table>
+<thead><tr><th>型</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><code>u8</code></td><td>操作を行うべき wave 内時間</td></tr>
+<tr><td><code>WaveOp</code></td><td>操作</td></tr>
+</tbody>
+</table>
+
+<p><code>WaveOp</code> は先頭バイトが <code>0x80</code> ならば赤玉生成 (1 バイト), <code>0..=51</code> ならば壁開け (3 バイト)。壁開け命令の構造は以下の通り:</p>
+
+<table>
+<thead><tr><th>型</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><code>u8</code></td><td>対象の<a href="/board/wall/">壁インデックス</a>。</td></tr>
+<tr><td><code>u8</code></td><td><a href="/board/wall/#hole-pattern">穴パターン</a>指定。<br>基本的に <code>(値)+1</code> を穴パターンとして設定するが、横壁の場合のみ値が 0 ならば<a href="/rng/">乱数</a>を用いて穴パターン <code>1..=5</code> のいずれかを設定する。</td></tr>
+<tr><td><code>u8</code></td><td>初期<a href="/board/wall/#timer">タイマー値</a>。</td></tr>
+</tbody>
+</table>
+
+</body>
+</html>

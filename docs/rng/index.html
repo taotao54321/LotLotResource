@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>ロットロット (FC) 攻略/解析 - 乱数</title>
+
+    <link rel="stylesheet" href="/asset/css/main.css">
+</head>
+<body>
+
+<header><a href="../">ロットロット (FC) 攻略/解析</a></header>
+
+<h1>乱数</h1>
+
+<p>本作の乱数生成器はシフトレジスタの一種で、初期値は 0, 周期は 65534。他に周期 2 の系列 <code>[0x5555, 0xAAAA]</code> があるが、通常は到達不能。</p>
+
+<p>内部状態の更新式を Rust で書くと以下のようになる:</p>
+
+<pre class="example"><code class="example">fn update(x: u16) -&gt; u16 {
+    let bit = !((x &gt;&gt; 15) ^ (x &gt;&gt; 1) ^ x) &amp; 1;
+
+    (x &lt;&lt; 1) | bit
+}
+</code></pre>
+
+<p>乱数の用途は以下の通り:</p>
+
+<ul>
+    <li>通常玉が 50pts に落下した際の<a href="/audio/sound/">効果音</a>選択。</li>
+    <li><a href="/wave/">wave</a> 内で指示されていれば横壁の穴パターンをランダムに設定する。</li>
+</ul>
+
+<p>よって、通常玉を 50pts に落とすタイミングを変えることで乱数調整ができる (が、穴パターンのランダム性はさほど攻略に影響しないと思われる)。</p>
+
+</body>
+</html>

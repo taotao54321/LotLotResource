@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>ロットロット (FC) 攻略/解析 - 盤面</title>
+
+    <link rel="stylesheet" href="/asset/css/main.css">
+</head>
+<body>
+
+<header><a href="../">ロットロット (FC) 攻略/解析</a></header>
+
+<h1>盤面</h1>
+
+<p>盤面内の部屋および壁については個別の項目を参照:</p>
+
+<ul>
+    <li><a href="room/">部屋</a></li>
+    <li><a href="wall/">壁</a></li>
+</ul>
+
+<p>「盤面」とは、ゲーム画面内の下図の領域を指す:</p>
+
+<div><img src="board-range.webp" alt="盤面の領域"></div>
+
+<p>盤面は 26 列 19 行で、各盤面セルは RAM <code>$0500-$06ED</code> で管理されている (row-major)。つまり、座標系および各行の RAM アドレスは下図のようになる:</p>
+
+<div><img src="board-coords.webp" alt="盤面の座標系および各行の RAM アドレス"></div>
+
+<h2 id="cell">盤面セル</h2>
+
+<p>盤面セルの bit7 は再描画フラグ。bit0-3 はセルの内容を表しており、値の意味は以下の通り:</p>
+
+<table>
+<thead><tr><th>bit0-3</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td><code>0</code></td><td>空白</td></tr>
+<tr><td><code>1..=3</code></td><td>(未使用)</td></tr>
+<tr><td><code>4</code></td><td>通常玉 (右移動)</td></tr>
+<tr><td><code>5</code></td><td>通常玉 (左移動)</td></tr>
+<tr><td><code>6</code></td><td>赤玉 (右移動)</td></tr>
+<tr><td><code>7</code></td><td>赤玉 (左移動)</td></tr>
+<tr><td><code>8..=9</code></td><td>(未使用)</td></tr>
+<tr><td><code>10</code></td><td>開いた壁</td></tr>
+<tr><td><code>11</code></td><td>閉じた壁</td></tr>
+<tr><td><code>12</code></td><td>開いた壁 + 通常玉 (右移動)</td></tr>
+<tr><td><code>13</code></td><td>開いた壁 + 通常玉 (左移動)</td></tr>
+<tr><td><code>14</code></td><td>開いた壁 + 赤玉 (右移動)</td></tr>
+<tr><td><code>15</code></td><td>開いた壁 + 赤玉 (左移動)</td></tr>
+</tbody>
+</table>
+
+<p>上表より、bit3 は壁フラグ (開閉状態問わず) となる。また、以下のことが成り立つ:</p>
+
+<ul>
+    <li>下位 3bit が 3 以上ならば玉または閉じた壁 (いずれも通過不能)。</li>
+    <li>下位 3bit が 4 以上ならば玉。</li>
+    <li>下位 3bit が 6 以上ならば赤玉。</li>
+    <li>玉の場合、bit0 が移動方向を表す (0:右, 1:左)。</li>
+</ul>
+
+</body>
+</html>

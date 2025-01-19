@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>ロットロット (FC) 攻略/解析 - RAM</title>
+
+    <link rel="stylesheet" href="/asset/css/main.css">
+</head>
+<body>
+
+<header><a href="../">ロットロット (FC) 攻略/解析</a></header>
+
+<h1>RAM</h1>
+
+<h2>概要</h2>
+
+<table>
+<thead>
+<tr><th>アドレス</th><th>型</th><th>内容</th></tr>
+</thead>
+<tbody>
+<tr><td><code>$00</code></td><td><code>u8</code></td><td><code>PPU_CTRL</code> (<code>$2000</code>) 管理用。</td></tr>
+<tr><td><code>$01</code></td><td><code>u8</code></td><td><code>PPU_MASK</code> (<code>$2001</code>) 管理用。<br>通常は常に <code>0x1E</code> で、レンダリングを有効化する際に <code>PPU_MASK</code> へ書き込まれる。</td></tr>
+<tr><td><code>$02</code></td><td><code>u8</code></td><td>現在レンダリングが有効かどうか (0:false, 非0:true)。<br>メインスレッド専用。</td></tr>
+<tr><td><code>$03-$0D</code></td><td></td><td>(雑用)</td></tr>
+<tr><td><code>$0E</code></td><td><code>u8</code></td><td>NMI スレッド完了フラグ (NMI ハンドラ内で 1 が書き込まれる)。</td></tr>
+<tr><td><code>$0F</code></td><td></td><td>(雑用: NMI スレッド専用)</td></tr>
+<tr><td><code>$10</code></td><td><code>u8</code></td><td><a href="#ppu-queue">PPU データ転送キュー</a>書き込みオフセット: 現在書き込んでいる要素の開始位置。</td></tr>
+<tr><td><code>$11</code></td><td><code>u8</code></td><td><a href="#ppu-queue">PPU データ転送キュー</a>書き込みオフセット: 現在のバイトの書き込み位置。</td></tr>
+<tr><td><code>$12</code></td><td><code>u8</code></td><td><a href="#ppu-queue">PPU データ転送キュー</a>読み取りオフセット。</td></tr>
+<tr><td><code>$13</code></td><td><code>u8</code></td><td>(雑用: NMI スレッドの PPU データ転送キュー消費処理用)</td></tr>
+<tr><td><code>$14</code></td><td><code>u8[2]</code></td><td>1P/2P 生入力 (ABSTUDLR)。</td></tr>
+<tr><td><code>$16</code></td><td><code>u8[2]</code></td><td>1P/2P エッジ入力 (ABSTUDLR)。</td></tr>
+<tr><td><code>$18</code></td><td><code>u8</code></td><td>ポーズフラグ。<br>NMI ハンドラ終了時に1Pエッジ入力 T があるとき真になる。</td></tr>
+<tr><td><code>$19</code></td><td><code>u8</code></td><td>スプライトバッファ選択 (0:スプライトバッファ 1, 1:スプライトバッファ 2)。<br>OAM DMA を行うたびにトグルされる。<br></td></tr>
+<tr><td><code>$1A-$21</code></td><td></td><td>(雑用)</td></tr>
+<tr><td><code>$22-$23</code></td><td></td><td>(未使用)</td></tr>
+<tr><td><code>$24-$28</code></td><td></td><td>(雑用: NMI スレッド専用)</td></tr>
+<tr><td><code>$29-$2B</code></td><td></td><td>(雑用)</td></tr>
+<tr><td><code>$2C</code></td><td><code>u8</code></td><td>ゲームプレイ中かどうか (0:false, 1:true)。</td></tr>
+<tr><td><code>$2D</code></td><td><code>u16be</code></td><td>自機の座標x (1/256 px 単位)。</td></tr>
+<tr><td><code>$2F</code></td><td><code>u16be</code></td><td>相方の座標x (1/256 px 単位)。</td></tr>
+<tr><td><code>$31</code></td><td><code>u16be</code></td><td>自機の座標y (1/256 px 単位)。</td></tr>
+<tr><td><code>$33</code></td><td><code>u16be</code></td><td>相方の座標y (1/256 px 単位)。</td></tr>
+<tr><td><code>$35</code></td><td><code>u8</code></td><td>自機の姿勢 (<code>0..=7</code>)。</td></tr>
+<tr><td><code>$36</code></td><td><code>u8</code></td><td>相方の姿勢 (<code>0..=7</code>)。</td></tr>
+<tr><td><code>$37</code></td><td><code>u8</code></td><td>自機の指している<a href="/board/room/">部屋</a>インデックス。</td></tr>
+<tr><td><code>$38</code></td><td><code>u8</code></td><td>相方の指している<a href="/board/room/">部屋</a>インデックス。</td></tr>
+<tr><td><code>$39</code></td><td><code>u8</code></td><td>swap 操作中の自機/相方の姿勢回転カウンタ (<code>0..=16</code>)。</td></tr>
+<tr><td><code>$3A</code></td><td><code>u8</code></td><td>swap 操作開始フラグ (0:false, 1:true)。</td></tr>
+<tr><td><code>$3B</code></td><td><code>u8</code></td><td><a href="#move-history">自機移動履歴</a>読み取りオフセット (<code>0..=161</code>)。</td></tr>
+<tr><td><code>$3C</code></td><td><code>u8</code></td><td><a href="#move-history">自機移動履歴</a>書き込みオフセット (<code>0..=161</code>)。</td></tr>
+<tr><td><code>$3D</code></td><td><code>u8</code></td><td><a href="/board/">盤面</a>の行 <code>3..=17</code> に玉が存在するかどうか (0:false, 非0:true)。</td></tr>
+<tr><td><code>$3E</code></td><td><code>u8</code></td><td>生成待ちの赤玉の個数。</td></tr>
+<tr><td><code>$3F</code></td><td><code>u8</code></td><td>(<em>write-only</em>: 赤玉を盤面外に落とした際にインクリメントされる)</td></tr>
+<tr><td><code>$40</code></td><td><code>u8</code></td><td>(<em>write-only</em>: 赤玉を盤面外に落とした際に移動元のマスが書き込まれる)</td></tr>
+<tr><td><code>$41</code></td><td></td><td>(未使用)</td></tr>
+<tr><td><code>$42</code></td><td><code>u8</code></td><td>カニの座標y (px)。</td></tr>
+<tr><td><code>$43</code></td><td><code>u8</code></td><td>カニの状態。<br><code>0..=1</code>: まだ紐に到達していない (値はアニメーション制御用)<br><code>2</code>: 紐を切る直前<br><code>3</code>: 紐を既に切った</td></tr>
+<tr><td><code>$44</code></td><td><code>u8</code></td><td>カニが上昇中かどうか (0:false, 1:true)。</td></tr>
+<tr><td><code>$45</code></td><td><code>u8</code></td><td>カニの状態遷移用カウンタ。</td></tr>
+<tr><td><code>$46</code></td><td><code>u8</code></td><td>2Pモードかどうか (0:false, 1:true)。</td></tr>
+<tr><td><code>$47</code></td><td><code>u8[7]</code></td><td>1Pスコア (10 単位、7 桁 unpacked BCD, 上位桁が先)。</td></tr>
+<tr><td><code>$4E</code></td><td><code>u8[7]</code></td><td>2Pスコア (10 単位、7 桁 unpacked BCD, 上位桁が先)。</td></tr>
+<tr><td><code>$55</code></td><td><code>u8[7]</code></td><td>ハイスコア (形式はスコアと同じ)。</td></tr>
+<tr><td><code>$5C</code></td><td><code>u8[2]</code></td><td>1P/2P スコア再描画フラグ (0:false, 1:true)。</td></tr>
+<tr><td><code>$5E</code></td><td><code>u8</code></td><td>ハイスコア再描画フラグ (0:false, 1:true)。</td></tr>
+<tr><td><code>$5F</code></td><td><code>u8</code></td><td>現在のプレイヤーID (0:1P, 1:2P)。</td></tr>
+<tr><td><code>$60</code></td><td><code>u8[2]</code></td><td>1P/2P 現在の面 (面イントロでの表示 (ROUND n) と一致する)。</td></tr>
+<tr><td><code>$62</code></td><td><code>u8[2]</code></td><td>1P/2P 残機 (プレイ中の自機を含む)。表示値と一致する。</td></tr>
+<tr><td><code>$64</code></td><td><code>u8[2]</code></td><td>1P/2P 再開時の <code>2 * (wave テーブル内インデックス)</code>。初期値は 0。</td></tr>
+<tr><td><code>$66</code></td><td><code>u8[7]</code></td><td>現在の面の目標スコア (形式はスコアと同じ)。</td></tr>
+<tr><td><code>$6D</code></td><td><code>u16le</code></td><td><a href="/rng/">乱数生成器</a>の内部状態。下位バイトが乱数として使われる。</td></tr>
+<tr><td><code>$6F-$73</code></td><td></td><td>(雑用)</td></tr>
+<tr><td><code>$74</code></td><td><code>u8</code></td><td>ターン管理用短周期カウンタ。毎ターンインクリメントされる。<br>初期値は -1 で、その後は mod 8 で扱われる。</td></tr>
+<tr><td><code>$75</code></td><td><code>u8</code></td><td>ターン管理用長周期カウンタ。毎ターンインクリメントされる。<br>初期値は -1 で、その後は mod 113 で扱われる。</td></tr>
+<tr><td><code>$76</code></td><td><code>u8</code></td><td><a href="/wave/">wave</a> 内時間。</td></tr>
+<tr><td><code>$77</code></td><td><code>u8</code></td><td><code>2 * (現在の <a href="/wave/">wave</a> テーブル内インデックス)</code>。</td></tr>
+<tr><td><code>$78</code></td><td><code>ptr</code></td><td>現在の <a href="/wave/">wave</a> データの先頭を指すポインタ。</td></tr>
+<tr><td><code>$7A-$91</code></td><td><code>u8[24]</code></td><td>盤面外の通常玉たちの座標x (px)。</td></tr>
+<tr><td><code>$92-$95</code></td><td><code>u8[4]</code></td><td>赤玉たちのスプライト座標x (px)。</td></tr>
+<tr><td><code>$96-$AD</code></td><td><code>u8[24]</code></td><td>盤面外の通常玉たちの座標y (px)。<br>値が 240 ならばその通常玉は存在しない。</td></tr>
+<tr><td><code>$AE-$B1</code></td><td><code>u8[4]</code></td><td>赤玉たちのスプライト座標y (px)。<br>値が 240 ならばその赤玉は存在しない。</td></tr>
+<tr><td><code>$B2</code></td><td><code>u8</code></td><td>ミス状態管理用カウンタ。<br>0 ならばミスしていないとみなされる。</td></tr>
+<tr><td><code>$B3</code></td><td><code>u8</code></td><td>現在の面の目標スコア達成フラグ (0:false, 0xFF:true)。</td></tr>
+<tr><td><code>$B4</code></td><td><code>u8</code></td><td>目標スコア達成後のボーナス残り時間。毎ターンデクリメントされる。<br>デクリメント結果が 0 になった時点でボーナス終了。</td></tr>
+<tr><td><code>$B5</code></td><td><code>u8</code></td><td>面クリア処理用カウンタ。</td></tr>
+<tr><td><code>$B6</code></td><td><code>u8</code></td><td>面クリア処理用カウンタ。</td></tr>
+<tr><td><code>$B7</code></td><td><code>u8</code></td><td><a href="/audio/">オーディオ</a>: 現在再生中の<a href="/audio/sound/">効果音</a>ID (0xFF:None)。</td></tr>
+<tr><td><code>$B8</code></td><td><code>ptr</code></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード用プログラムカウンタ。<br>値は NES 側の CPU 論理アドレスそのまま。</td></tr>
+<tr><td><code>$BA</code></td><td><code>u8</code></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード用スタックポインタ。<br>値は <code>$07B0</code> からのオフセットで、「現在スタックトップにある値」を指す。<br>スタックが空の場合 16 (これが初期値)。</td></tr>
+<tr><td><code>$BB</code></td><td><code>u8</code></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>ウェイトカウンタ。<br>効果音を再生中でない場合 0。</td></tr>
+<tr><td><code>$BC</code></td><td><code>u8</code></td><td><a href="/audio/">オーディオ</a>: 現在再生中の<a href="/audio/sound/">効果音</a>の nice 値。<br>値が小さい方が優先度が高い。同点の場合、後から再生された方が優先される。<br>効果音を再生中でない場合 0xFF。</td></tr>
+<tr><td><code>$BD</code></td><td><code>u8</code></td><td><a href="/audio/">オーディオ</a>: 現在再生中の<a href="/audio/sound/">効果音</a>で使用する APU チャンネルのマスク (bit0:矩形波A, bit1:矩形波B, bit2:三角波, bit3:ノイズ)。<br><span class="note">NOTE</span>: 初期値は 0xFF で、この状態では音楽が再生されない。</td></tr>
+<tr><td><code>$BE</code></td><td><code>u8</code></td><td><a href="/audio/">オーディオ</a>: 現在再生中の<a href="/audio/music/">音楽</a>ID (0xFF:None)。</td></tr>
+<tr><td><code>$BF</code></td><td><code>ptr</code></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード用プログラムカウンタ。<br>値は NES 側の CPU 論理アドレスそのまま。</td></tr>
+<tr><td><code>$C1</code></td><td><code>u8</code></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード用スタックポインタ。<br>値は <code>$07C0</code> からのオフセットで、「現在スタックトップにある値」を指す。<br>スタックが空の場合 16 (これが初期値)。</td></tr>
+<tr><td><code>$C2</code></td><td><code>u8</code></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>ウェイトカウンタ。<br>音楽を再生中でない場合 0。</td></tr>
+<tr><td><code>$C3</code></td><td></td><td>(<em>write-only</em>)</td></tr>
+<tr><td><code>$C4</code></td><td><code>u8</code></td><td>NMI カウンタ。NMI ハンドラが呼ばれるたびにインクリメントされる。</td></tr>
+<tr><td><code>$C5-$FF</code></td><td></td><td>(未使用)</td></tr>
+<tr><td><code>$0100</code></td><td><code>u8[52]</code></td><td>各壁の<a href="/board/wall/#timer">タイマー値</a>。</td></tr>
+<tr><td><code>$0134</code></td><td><code>u8[52]</code></td><td>各壁の<a href="/board/wall/#state-counter">状態カウンタ</a>。</td></tr>
+<tr><td><code>$0168</code></td><td><code>u8[52]</code></td><td>各壁の<a href="/board/wall/#hole-pattern">穴パターン</a>。</td></tr>
+<tr><td><code>$019C-$01CF</code></td><td></td><td>(雑用)</td></tr>
+<tr><td><code>$01D0-$01FF</code></td><td></td><td>(スタック領域)</td></tr>
+<tr><td><code>$0200-$02FF</code></td><td><code>Sprite[64]</code></td><td>スプライトバッファ 1。<br>スプライトバッファ 2 と交互に OAM へ DMA 転送される。</td></tr>
+<tr><td><code>$0300-$03FF</code></td><td><code>Sprite[64]</code></td><td>スプライトバッファ 2。<br>スプライトバッファ 1 と交互に OAM へ DMA 転送される。</td></tr>
+<tr><td><code>$0400-$04FF</code></td><td><code>u8[0x100]</code></td><td><a href="#ppu-queue">PPU データ転送キュー</a>。</td></tr>
+<tr><td><code>$0500-$06ED</code></td><td><code>u8[26*19]</code></td><td><a href="/board/">盤面</a> (26 列 19 行)。</td></tr>
+<tr><td><code>$06EE-$078F</code></td><td><code>u8[162]</code></td><td><a href="#move-history">自機移動履歴</a>。</td></tr>
+<tr><td><code>$0790-$079F</code></td><td><code>u8[0x10]</code></td><td><a href="/audio/">オーディオ</a>: APU レジスタ値キャッシュ。大まかには <code>$4000-$400F</code> に「直前に書いた」値を保持すると考えられる。<br><span class="note">NOTE</span>: 必ずしも愚直に書いた値を保持するわけではなく、恣意的な値に設定される場合もある。<br>また、オーディオドライバ(再)初期化時に 0xFF で埋められる。</td></tr>
+<tr><td><code>$07A0-$07AF</code></td><td><code>u8[0x10]</code></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>側の APU レジスタ値バッファ (APU レジスタ <code>$4000-$400F</code> に書こうとしている値)。<br><span class="note">NOTE</span>: 必ずしも実際に APU レジスタに書かれるとは限らない (効果音との調停や APU レジスタ値キャッシュの内容に依存する)。<br>また、<span class="xxx">一切の初期化処理が行われない</span>。</td></tr>
+<tr><td><code>$07B0-$07BF</code></td><td></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード用スタック (16 バイト)。上位から下位へ伸びる。</td></tr>
+<tr><td><code>$07C0-$07CF</code></td><td></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード用スタック (16 バイト)。上位から下位へ伸びる。</td></tr>
+<tr><td><code>$07D0-$07FF</code></td><td></td><td>(未使用)</td></tr>
+</tbody>
+</table>
+
+<h2>詳細</h2>
+
+<h3 id="ppu-queue"><code>$0400-$04FF</code>: PPU データ転送キュー</h3>
+
+<p>PPU へデータを非同期転送するための機構。メインスレッドによって転送データが書き込まれ、NMI スレッドがそれを読み取って PPU への転送を行う。</p>
+
+<p>実装はリングバッファで、書き込みオフセットは <code>$10-$11</code>, 読み取りオフセットは <code>$12</code> で管理される。</p>
+
+<p>キュー内の要素は以下の構造体:</p>
+
+<table>
+<thead>
+<tr><th>型</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><code>u16be</code></td><td>転送先 PPU アドレスおよび転送方向。<br>bit0-14: 転送先 PPU アドレス<br>bit15: 転送方向 (0:横, 1:縦)</td></tr>
+<tr><td><code>u8</code></td><td>転送バイト長。</td></tr>
+<tr><td><code>u8[]</code></td><td>転送データ。</td></tr>
+</tbody>
+</table>
+
+<h3 id="move-history"><code>$06FF-$078F</code>: 自機移動履歴</h3>
+
+<p>自機の移動方向の履歴 (長さ 162)。相方はこれを参照して動く。自機が移動可能であるとき NMI ハンドラ内で書き込み/参照される。</p>
+
+<p>実装はリングバッファで、書き込みオフセットは <code>$3C</code>, 読み取りオフセットは <code>$3B</code> で管理される。</p>
+
+<p>面開始時、書き込みオフセットは 161, 読み取りオフセットは 0 で初期化される。つまり、相方は自機から 161 フレーム遅れて動くことになる。</p>
+
+<p>値の意味:</p>
+
+<ul>
+    <li><code>0..=7</code>: 移動方向 (上から時計回り。即ち U, UR, R, ..., L, UL)</li>
+    <li><code>0xFF</code>: 移動しない</li>
+</ul>
+
+<p>履歴は面開始時にゼロクリアされる。よって、相方は面開始後 161 フレームの間 U 方向へ動こうとするが、これは座標制限に掛かるので実質移動しないのと同じになる。</p>
+
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>ロットロット (FC) 攻略/解析 - 盤面 - 壁</title>
+
+    <link rel="stylesheet" href="/asset/css/main.css">
+    <style>
+        pre.holes {
+            margin: 1px 1px 1px 1px;
+            background-color: #CCCCCC;
+        }
+    </style>
+</head>
+<body>
+
+<header><a href="../../">ロットロット (FC) 攻略/解析</a> - <a href="../">盤面</a></header>
+
+<h1>壁</h1>
+
+<p>盤面内には 52 個の開閉する壁があり、以下の 3 種に分類される:</p>
+
+<ul>
+    <li>横壁 (5x1, 壁インデックス <code>0..=19</code>)</li>
+    <li>縦壁 (1x3, 壁インデックス <code>20..=35</code>)</li>
+    <li>交点壁 (1x1, 壁インデックス <code>36..=51</code>)</li>
+</ul>
+
+<h2>横壁</h2>
+
+<p>各横壁のインデックスおよび左端の RAM アドレスは下図の通り:</p>
+
+<div><img src="board-wall-hori.webp" alt="各横壁のインデックスおよび左端の RAM アドレス"></div>
+
+<h2>縦壁</h2>
+
+<p>各縦壁のインデックスおよび左端の RAM アドレスは下図の通り:</p>
+
+<div><img src="board-wall-vert.webp" alt="各縦壁のインデックスおよび左端の RAM アドレス"></div>
+
+<h2>交点壁</h2>
+
+<p>各交点壁のインデックスおよび RAM アドレスは下図の通り:</p>
+
+<div><img src="board-wall-cross.webp" alt="各交点壁のインデックスおよび RAM アドレス"></div>
+
+<h2>壁の状態</h2>
+
+<p>各壁は以下の状態を持つ:</p>
+
+<ul>
+    <li><a href="#state-counter">状態カウンタ</a></li>
+    <li><a href="#timer">タイマー値</a></li>
+    <li><a href="#hole-pattern">穴パターン</a></li>
+</ul>
+
+<h3 id="state-counter">状態カウンタ</h3>
+
+<p>これは壁が開いてから閉じるまでの状態を管理する。値の意味は以下の通り:</p>
+
+<table>
+<thead><tr><th>値</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td><code>0</code></td><td>閉じたまま。</td></tr>
+<tr><td><code>1..=14</code></td><td>閉じており、点滅アニメーション中。</td></tr>
+<tr><td><code>15</code></td><td>閉じており、開いた状態で描画する直前。</td></tr>
+<tr><td><code>16..=22</code></td><td>閉じており、開いた状態で描画されている。</td></tr>
+<tr><td><code>23</code></td><td>閉じており、開く (盤面セルたちを更新する) 直前。</td></tr>
+<tr><td><code>24</code></td><td>開いており、タイマー値更新中。条件を満たしたら閉じる。</td></tr>
+<tr><td><code>25..=48</code></td><td>閉じており、点滅アニメーション中。</td></tr>
+<tr><td><code>49</code></td><td>閉じており、閉じた状態で描画する直前。<br>描画したら状態カウンタを 0 にリセットする。</td></tr>
+</tbody>
+</table>
+
+<h3 id="timer">タイマー値</h3>
+
+<p>これは開いた壁が閉じるまでの時間を管理する。bit7 によって意味が異なる:</p>
+
+<ul>
+    <li>bit7 が 0 の場合、ターン管理用短周期カウンタ (mod 8) が 0 になるたびにデクリメントされ、値が負になったら壁が閉じる。</li>
+    <li>bit7 が 1 の場合、ターン管理用長周期カウンタ (mod 113) が 0 になるたびにデクリメントされ、値が 0x7F になったら壁が閉じる。</li>
+</ul>
+
+<p>ただし、いずれの場合も閉じようとする壁が内部に赤玉を含む場合、閉じる処理をキャンセルし、デクリメント後のタイマー値をインクリメントして元に戻す。</p>
+
+<h3 id="hole-pattern">穴パターン</h3>
+
+<p>これは開いた壁を構成する各盤面セルの開閉状態を保持する。どの種類の壁でも値 0 は全てのセルが閉じていることを示す。</p>
+
+<h4>横壁の穴パターン</h4>
+
+<table>
+<tbody>
+<tr><th><code>0</code></th><td style="text-align: center;"><pre class="holes">#####</pre></td></tr>
+<tr><th><code>1</code></th><td style="text-align: center;"><pre class="holes">.####</pre></td></tr>
+<tr><th><code>2</code></th><td style="text-align: center;"><pre class="holes">#.###</pre></td></tr>
+<tr><th><code>3</code></th><td style="text-align: center;"><pre class="holes">##.##</pre></td></tr>
+<tr><th><code>4</code></th><td style="text-align: center;"><pre class="holes">###.#</pre></td></tr>
+<tr><th><code>5</code></th><td style="text-align: center;"><pre class="holes">####.</pre></td></tr>
+<tr><th><code>6</code></th><td style="text-align: center;"><pre class="holes">#.#.#</pre></td></tr>
+<tr><th><code>7</code></th><td style="text-align: center;"><pre class="holes">.....</pre></td></tr>
+</tbody>
+</table>
+
+<h4>縦壁の穴パターン</h4>
+
+<table>
+<thead><tr><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th></tr></thead>
+<tbody><tr>
+<td><pre class="holes">
+#
+#
+#
+</pre></td>
+<td><pre class="holes">
+#
+#
+.
+</pre></td>
+<td><pre class="holes">
+.
+#
+.
+</pre></td>
+<td><pre class="holes">
+#
+.
+.
+</pre></td>
+<td><pre class="holes">
+#
+.
+#
+</pre></td>
+<td><pre class="holes">
+.
+.
+#
+</pre></td>
+<td><pre class="holes">
+.
+#
+#
+</pre></td>
+<td><pre class="holes">
+.
+.
+.
+</pre></td>
+</tr></tbody>
+</table>
+
+<h4>交点壁の穴パターン</h4>
+
+<table>
+<tbody>
+<tr><th><code>0</code></th><td style="text-align: center;"><pre class="holes">#</pre></td></tr>
+<tr><th><code>1</code></th><td style="text-align: center;"><pre class="holes">.</pre></td></tr>
+</tbody>
+</table>
+
+</body>
+</html>

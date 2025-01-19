@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>ロットロット (FC) 攻略/解析 - PRG-ROM</title>
+
+    <link rel="stylesheet" href="/asset/css/main.css">
+    <style>
+        span.code {
+            background-color: #88C088;
+        }
+        span.data {
+            background-color: #A0C0E0;
+        }
+    </style>
+</head>
+<body>
+
+<header><a href="../">ロットロット (FC) 攻略/解析</a></header>
+
+<h1>PRG-ROM</h1>
+
+<h2>概要</h2>
+
+<p>空き領域は全て 0xFF で埋められている。</p>
+
+<table>
+<thead>
+<tr><th>アドレス</th><th>型</th><th>内容</th></tr>
+</thead>
+<tbody>
+    <tr><td><code>$8000</code></td><td><span class="code">code</span></td><td>RESET 割り込みハンドラ。</td></tr>
+    <tr><td><code>$802B</code></td><td><span class="code">code</span></td><td>NMI 割り込みハンドラ。</td></tr>
+    <tr><td><code>$8070</code></td><td><span class="code">code</span></td><td>IRQ 割り込みハンドラ。無限ループする (本作では IRQ は使わない)。</td></tr>
+    <tr><td><code>$8073</code></td><td><span class="code">code</span></td><td>ゲームを開始する。</td></tr>
+    <tr><td><code>$80A1</code></td><td><span class="code">code</span></td><td>手番のプレイヤーについて現在の面をイントロから開始する。</td></tr>
+    <tr><td><code>$8178</code></td><td><span class="code">code</span></td><td>ゲームプレイ中の通常のメインループ。</td></tr>
+    <tr><td><code>$8200</code></td><td><span class="code">code</span></td><td>ミス後の再開処理。</td></tr>
+    <tr><td><code>$820F</code></td><td><span class="code">code</span></td><td>面イントロからの再開処理 (ミス後または面クリア後にここに来る)。</td></tr>
+    <tr><td><code>$821F</code></td><td><span class="code">code</span></td><td>面クリア処理。</td></tr>
+    <tr><td><code>$830A</code></td><td><span class="code">code</span></td><td>(未使用) NMI を無効化する。</td></tr>
+    <tr><td><code>$830E</code></td><td><span class="code">code</span></td><td>(未使用) <code>PPU_CTRL</code> (<code>$2000</code>) およびその管理用変数 <code>$00</code> に値を書き込む。</td></tr>
+    <tr><td><code>$8314</code></td><td><span class="code">code</span></td><td>(未使用) NMI を有効化する。</td></tr>
+    <tr><td><code>$831A</code></td><td><span class="code">code</span></td><td>NMI スレッドに制御を譲り、完了を待つ。<br>NMI が無効な場合は次の VBLANK の開始を待つ (が、本作ではブート時を除き NMI は常時有効)。</td></tr>
+    <tr><td><code>$8335</code></td><td><span class="code">code</span></td><td>レンダリングを無効化する (事前に NMI を待つ)。レンダリング有効状態 <code>$02</code> の更新も行う。</td></tr>
+    <tr><td><code>$8337</code></td><td><span class="code">code</span></td><td>レンダリングを有効化または無効化する (事前に NMI を待つ)。レンダリング有効状態 <code>$02</code> の更新も行う。</td></tr>
+    <tr><td><code>$8340</code></td><td><span class="code">code</span></td><td>レンダリングを有効化する (事前に NMI を待つ)。レンダリング有効状態 <code>$02</code> の更新も行う。</td></tr>
+    <tr><td><code>$8344</code></td><td><span class="code">code</span></td><td>(未使用) ネームテーブルアドレス計算。</td></tr>
+    <tr><td><code>$837E</code></td><td><span class="code">code</span></td><td>矩形データ (塗りつぶし) 転送ルーチン。</td></tr>
+    <tr><td><code>$8384</code></td><td><span class="code">code</span></td><td>矩形データ (ベタ) 転送ルーチン。</td></tr>
+    <tr><td><code>$8388</code></td><td><span class="code">code</span></td><td><a href="#PostRectImpl">矩形データ転送ルーチン</a>。<br><code>$837E</code>, <code>$8384</code> 下請け。</td></tr>
+    <tr><td><code>$83CC</code></td><td><span class="code">code</span></td><td>横長の矩形データ転送ルーチン。<br><code>$8388</code> 下請け。</td></tr>
+    <tr><td><code>$8429</code></td><td><span class="code">code</span></td><td>縦長の矩形データ転送ルーチン。<br><code>$8388</code> 下請け。</td></tr>
+    <tr><td><code>$848B</code></td><td><span class="code">code</span></td><td><a href="/ram/#ppu-queue">PPU データ転送キュー</a>への要素の書き込みを開始する。</td></tr>
+    <tr><td><code>$84A0</code></td><td><span class="code">code</span></td><td><a href="/ram/#ppu-queue">PPU データ転送キュー</a>へ現在の要素内の 1 バイトを書き込む。</td></tr>
+    <tr><td><code>$84AC</code></td><td><span class="code">code</span></td><td><a href="/ram/#ppu-queue">PPU データ転送キュー</a>への要素の書き込みを完了する。</td></tr>
+    <tr><td><code>$84B1</code></td><td><span class="code">code</span></td><td><a href="/ram/#ppu-queue">PPU データ転送キュー</a>の内容を消費し、PPU へ転送する。<br>NMI スレッド専用。<br><span class="note">NOTE</span>: 60 バイト以上消費した時点で打ち切る。</td></tr>
+    <tr><td><code>$850D</code></td><td><span class="code">code</span></td><td>1P/2P入力を更新する。<br>NMI スレッド専用。</td></tr>
+    <tr><td><code>$851A</code></td><td><span class="code">code</span></td><td>指定したコントローラーの入力を更新する。<br><code>$850D</code> 下請け。</td></tr>
+    <tr><td><code>$853A</code></td><td><span class="code">code</span></td><td>(未使用)</td></tr>
+    <tr><td><code>$855E</code></td><td><span class="code">code</span></td><td>(未使用)</td></tr>
+    <tr><td><code>$8584</code></td><td><span class="code">code</span></td><td>(未使用)</td></tr>
+    <tr><td><code>$8591</code></td><td><span class="code">code</span></td><td><a href="/board/">盤面</a>上の玉の更新処理。<br>既存の全ての玉に対して更新処理を行い、可能なら新しい玉を生成する。</td></tr>
+    <tr><td><code>$8775</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>の各行の先頭を指すアドレステーブル。(下位バイト配列, 上位バイト配列) の形式。<br>なぜか <span class="xxx">19 行ではなく 21 行分ある</span>が、末尾の 2 行分は実質未使用。</td></tr>
+    <tr><td><code>$879F</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>の各行に対する初期値テーブル (<code>$87B4</code>) 内インデックス。<br>なぜか <span class="xxx">19 行ではなく 21 行分ある</span>が、末尾の 2 行分は実質未使用。</td></tr>
+    <tr><td><code>$87B4</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>の行の初期値テーブル。</td></tr>
+    <tr><td><code>$87BA</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>の行 <code>0..=1</code> の初期値。</td></tr>
+    <tr><td><code>$87D4</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>の行 <code>2, 6, 10, 14, 18</code> の初期値 (右端 2 列以外全て閉じた壁)。</td></tr>
+    <tr><td><code>$87EE</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>の行 <code>3..=5, 7..=9, 11..=13, 15..=17</code> の初期値。</td></tr>
+    <tr><td><code>$8808</code></td><td><span class="code">code</span></td><td><a href="/board/">盤面</a>を初期化する。<br><span class="xxx">19 行ではなく 20 行分初期化する</span> (off-by-one)。これにより<a href="/ram/#move-history">自機移動履歴</a>が一部上書きされるが、この領域は後から改めて初期化されるので実害はない。</td></tr>
+    <tr><td><code>$8833</code></td><td><span class="code">code</span></td><td>swap 操作を行う。</td></tr>
+    <tr><td><code>$8853</code></td><td><span class="code">code</span></td><td>部屋ペア内の 1 つの行に対する swap 操作を行う。<br><code>$8833</code> 下請け。</td></tr>
+    <tr><td><code>$8874</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>内の各部屋の左上隅を指すアドレステーブル。(下位バイト配列, 上位バイト配列) の形式。</td></tr>
+    <tr><td><code>$8894</code></td><td><span class="code">code</span></td><td><a href="/board/">盤面</a>を再描画する (常に非同期)。</td></tr>
+    <tr><td><code>$89F1</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>の各行の先頭を指すネームテーブル PPU アドレステーブル。(下位バイト配列, 上位バイト配列) の形式。</td></tr>
+    <tr><td><code>$8A1B</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>セル値の下位 4bit に対応するBGタイルIDのテーブル。</td></tr>
+    <tr><td><code>$8A2B</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>の各行に対応する赤玉スプライト座標yのテーブル。</td></tr>
+    <tr><td><code>$8A3E</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>の各列に対応する赤玉スプライト座標xのテーブル。</td></tr>
+    <tr><td><code>$8A58</code></td><td><span class="code">code</span></td><td>カニ部屋にある玉の数を返す。</td></tr>
+    <tr><td><code>$8A72</code></td><td><span class="data">data</span></td><td>カニ部屋の各マスへのオフセットテーブル (部屋の左上隅のマスを基準とする)。</td></tr>
+    <tr><td><code>$8A81</code></td><td><span class="code">code</span></td><td><a href="/rng/">乱数</a>を更新する。</td></tr>
+    <tr><td><code>$8A97</code></td><td><span class="code">code</span></td><td>NMI 待ちルーチン <code>$831A</code> を指定回数呼ぶ。</td></tr>
+    <tr><td><code>$8A9E</code></td><td><span class="code">code</span></td><td>描画を有効化し、BGスクロールの再設定を行う。レンダリング有効状態 <code>$02</code> の更新も行う。</td></tr>
+    <tr><td><code>$8AA1</code></td><td><span class="code">code</span></td><td>BGスクロールを再設定し、描画を有効化する。レンダリング有効状態 <code>$02</code> の更新は<span class="note">行わない</span>。<br>NMI スレッドから直接呼ばれる。</td></tr>
+    <tr><td><code>$8ABE</code></td><td><span class="code">code</span></td><td>レンダリングを無効化し、画面をクリアする。<br>ネームテーブル 0, 2 はともに空白タイル 0x2C でクリアされ、2 つのスプライトバッファはともに全スプライト非表示となる (240 で埋められる)。</td></tr>
+    <tr><td><code>$8AD9</code></td><td><span class="data">data</span></td><td>ネームテーブル 0 を空白タイル 0x2C でクリアするための矩形データ。</td></tr>
+    <tr><td><code>$8ADE</code></td><td><span class="data">data</span></td><td>ネームテーブル 2 を空白タイル 0x2C でクリアするための矩形データ。</td></tr>
+    <tr><td><code>$8AE3</code></td><td><span class="code">code</span></td><td>自機/相方の回転状態を更新し、自機/相方スプライトをスプライトバッファに書き込む。<br>ゲームプレイ中に NMI スレッドから呼ばれる。</td></tr>
+    <tr><td><code>$8BA9</code></td><td><span class="data">data</span></td><td>自機/相方スプライトの開始タイルID加算値テーブル。</td></tr>
+    <tr><td><code>$8BB1</code></td><td><span class="data">data</span></td><td>自機/相方スプライトのスプライト属性テーブル (水平/垂直方向の反転指示)。</td></tr>
+    <tr><td><code>$8BB9</code></td><td><span class="data">data</span></td><td>自機/相方スプライトの変位yテーブル。</td></tr>
+    <tr><td><code>$8BE9</code></td><td><span class="data">data</span></td><td>自機/相方スプライトの変位xテーブル。</td></tr>
+    <tr><td><code>$8C19</code></td><td><span class="data">data</span></td><td>自機/相方の姿勢に対応するスプライト変位テーブル内オフセットたち。</td></tr>
+    <tr><td><code>$8C21</code></td><td><span class="code">code</span></td><td>カニのスプライトをスプライトバッファに書き込む。</td></tr>
+    <tr><td><code>$8C7E</code></td><td><span class="data">data</span></td><td><code>$8C21</code> 関連。</td></tr>
+    <tr><td><code>$8C82</code></td><td><span class="data">data</span></td><td><code>$8C21</code> 関連。</td></tr>
+    <tr><td><code>$8C86</code></td><td><span class="data">data</span></td><td><code>$8C21</code> 関連。</td></tr>
+    <tr><td><code>$8C8A</code></td><td><span class="data">data</span></td><td><code>$8C21</code> 関連。</td></tr>
+    <tr><td><code>$8CB9</code></td><td><span class="data">data</span></td><td><code>$8C21</code> 関連。</td></tr>
+    <tr><td><code>$8CE8</code></td><td><span class="code">code</span></td><td>赤玉スプライトをスプライトバッファに書き込み、盤面外の通常玉の更新処理を行う。</td></tr>
+    <tr><td><code>$8DAF</code></td><td><span class="data">data</span></td><td>(未使用)</td></tr>
+    <tr><td><code>$8DC3</code></td><td><span class="code">code</span></td><td>盤面外の玉を生成する。<br><code>$8591</code> 下請け。</td></tr>
+    <tr><td><code>$8DE9</code></td><td><span class="code">code</span></td><td>スプライトバッファオフセット操作: <code>$1A</code> を 4 進め、<code>$1B</code> を 4 戻す。</td></tr>
+    <tr><td><code>$8DF8</code></td><td><span class="code">code</span></td><td>スプライトバッファオフセット操作: <code>$24</code> を 4 進める。</td></tr>
+    <tr><td><code>$8E00</code></td><td><span class="code">code</span></td><td>スコア/ハイスコア再描画処理。必要な場合のみ再描画する。</td></tr>
+    <tr><td><code>$8EBB</code></td><td><span class="code">code</span></td><td>入力処理および自機/相方の移動処理。<br>ゲームプレイ中に NMI スレッドから呼ばれる。</td></tr>
+    <tr><td><code>$8F73</code></td><td><span class="code">code</span></td><td>与えられた座標に対応する部屋インデックスを返す。</td></tr>
+    <tr><td><code>$8F9A</code></td><td><span class="code">code</span></td><td>自機および相方の移動処理。</td></tr>
+    <tr><td><code>$9001</code></td><td><span class="data">data</span></td><td>自機の移動方向に対応する方向キー入力のテーブル。</td></tr>
+    <tr><td><code>$9009</code></td><td><span class="data">data</span></td><td>自機/相方が移動可能範囲の左端にいる場合の移動方向補正テーブル (座標制限用)。</td></tr>
+    <tr><td><code>$9011</code></td><td><span class="data">data</span></td><td>自機/相方が移動可能範囲の上端にいる場合の移動方向補正テーブル (座標制限用)。</td></tr>
+    <tr><td><code>$9019</code></td><td><span class="data">data</span></td><td>自機/相方が移動可能範囲の右端にいる場合の移動方向補正テーブル (座標制限用)。</td></tr>
+    <tr><td><code>$9021</code></td><td><span class="data">data</span></td><td>自機/相方が移動可能範囲の下端にいる場合の移動方向補正テーブル (座標制限用)。</td></tr>
+    <tr><td><code>$9029</code></td><td><span class="data">data</span></td><td>自機/相方の移動方向に対応する変位x (i16) のテーブル。(下位バイト配列, 上位バイト配列) の形式。</td></tr>
+    <tr><td><code>$9039</code></td><td><span class="data">data</span></td><td>自機/相方の移動方向に対応する変位y (i16) のテーブル。(下位バイト配列, 上位バイト配列) の形式。</td></tr>
+    <tr><td><code>$9049</code></td><td><span class="code">code</span></td><td><a href="#AddScore">スコア加算ルーチン</a>。付随する諸々の処理も行う。</td></tr>
+    <tr><td><code>$9106</code></td><td><span class="data">data</span></td><td>1P/2Pスコア末尾へのオフセットテーブル (アドレス <code>$47</code> を基準とする)。</td></tr>
+    <tr><td><code>$9108</code></td><td><span class="data">data</span></td><td>目標スコア到達時のBGパレット変更用データ。<br>便宜上、矩形データ (4x1) 形式としている。</td></tr>
+    <tr><td><code>$9110</code></td><td><span class="data">data</span></td><td>目標スコア到達時のスプライトパレット変更用データ。便宜上、矩形データ (4x1) 形式としている。</td></tr>
+    <tr><td><code>$9118</code></td><td><span class="code">code</span></td><td>カニの更新処理。</td></tr>
+    <tr><td><code>$91B9</code></td><td><span class="code">code</span></td><td>面イントロシーン。</td></tr>
+    <tr><td><code>$926E</code></td><td><span class="data">data</span></td><td>面イントロ: "PLAYER {n}" を消去するための矩形データ (塗りつぶし)。</td></tr>
+    <tr><td><code>$9273</code></td><td><span class="data">data</span></td><td>面イントロ: "PLAYER 1" の矩形データ。<br>文字 '1' を書き換えることで "PLAYER 2" の描画にも使われる。</td></tr>
+    <tr><td><code>$927F</code></td><td><span class="data">data</span></td><td>面イントロ: "ROUND   " の矩形データ。<br>末尾 2 バイトは適宜書き換えられる。</td></tr>
+    <tr><td><code>$928B</code></td><td><span class="data">data</span></td><td>面イントロ: "LET'S GET    0000 PTS." の矩形データ。<br>万の位以上は適宜書き換えられる。</td></tr>
+    <tr><td><code>$92A5</code></td><td><span class="data">data</span></td><td>面イントロシーン用パレット。<br>便宜上、矩形データ (32x1) 形式としている。</td></tr>
+    <tr><td><code>$92C9</code></td><td><span class="data">data</span></td><td>面イントロシーン用アトリビュートテーブル。<br>便宜上、矩形データ (64x1) 形式としている。</td></tr>
+    <tr><td><code>$930D</code></td><td><span class="code">code</span></td><td>目標スコア更新処理。面イントロシーンから呼ばれる。</td></tr>
+    <tr><td><code>$9363</code></td><td><span class="data">data</span></td><td>1, 2 面における目標スコア。</td></tr>
+    <tr><td><code>$9371</code></td><td><span class="code">code</span></td><td>ミス状態の更新処理。</td></tr>
+    <tr><td><code>$9441</code></td><td><span class="data">data</span></td><td><code>$9371</code> 関連。</td></tr>
+    <tr><td><code>$944A</code></td><td><span class="data">data</span></td><td><code>$9371</code> 関連。</td></tr>
+    <tr><td><code>$9454</code></td><td><span class="data">data</span></td><td><code>$9371</code> 関連。</td></tr>
+    <tr><td><code>$945E</code></td><td><span class="data">data</span></td><td><code>$9371</code> 関連。</td></tr>
+    <tr><td><code>$946C</code></td><td><span class="data">data</span></td><td><code>$9371</code> 関連。</td></tr>
+    <tr><td><code>$947B</code></td><td><span class="data">data</span></td><td><code>$9371</code> 関連。</td></tr>
+    <tr><td><code>$948A</code></td><td><span class="code">code</span></td><td>ゲーム画面を構築する。</td></tr>
+    <tr><td><code>$9506</code></td><td><span class="data">data</span></td><td>ゲーム画面: 手番でない側のプレイヤー番号 '1', '2' 描画用矩形データのヘッダ。</td></tr>
+    <tr><td><code>$950A</code></td><td><span class="data">data</span></td><td>ゲーム画面: 手番の側のプレイヤー番号 '1' (大フォント) 描画用矩形データ。</td></tr>
+    <tr><td><code>$9512</code></td><td><span class="data">data</span></td><td>ゲーム画面: 手番の側のプレイヤー番号 '2' (大フォント) 描画用矩形データ。</td></tr>
+    <tr><td><code>$951A</code></td><td><span class="data">data</span></td><td>ゲーム画面: 手番の側のプレイヤーの残機数描画用矩形データのヘッダ。</td></tr>
+    <tr><td><code>$951E</code></td><td><span class="data">data</span></td><td>ゲーム画面: 面ごとのパレット設定 (通常玉の色変更)。<br><code>((現在の面) - 1) mod 8</code> をインデックスとする。</td></tr>
+    <tr><td><code>$952E</code></td><td><span class="data">data</span></td><td>ゲーム画面の基本パレット。便宜上、矩形データ (32x1) 形式としている。</td></tr>
+    <tr><td><code>$9552</code></td><td><span class="data">data</span></td><td>ゲーム画面の初期 tilemap。便宜上、矩形データ (32x32) 形式としている。</td></tr>
+    <tr><td><code>$9956</code></td><td><span class="data">data</span></td><td>(未使用)</td></tr>
+    <tr><td><code>$995E</code></td><td><span class="code">code</span></td><td>タイトルシーン。</td></tr>
+    <tr><td><code>$9A21</code></td><td><span class="data">data</span></td><td>タイトル: カーソルインデックスに対応する赤玉スプライト座標y。</td></tr>
+    <tr><td><code>$9A23</code></td><td><span class="data">data</span></td><td>タイトル: "LotLot" ロゴの左半分 "Lot" の矩形データ (先頭 1 行)。<br>後続の行は <code>0xD8..=0xFF</code> の連番となる。<br>PPU アドレスを書き換えることで右半分の描画にも使われる。</td></tr>
+    <tr><td><code>$9A2F</code></td><td><span class="data">data</span></td><td>タイトル: "1 PLAYER GAME" の矩形データ。<br>PPU アドレスおよび文字 '1' を書き換えることで "2 PLAYER GAME" の描画にも使われる。</td></tr>
+    <tr><td><code>$9A40</code></td><td><span class="data">data</span></td><td>タイトル: "HI-SCORE" の矩形データ。</td></tr>
+    <tr><td><code>$9A4C</code></td><td><span class="data">data</span></td><td>タイトル: 著作権表示 (徳間書店) の矩形データ。</td></tr>
+    <tr><td><code>$9A7E</code></td><td><span class="data">data</span></td><td>タイトル: 著作権表示 (アイレム) の矩形データ。</td></tr>
+    <tr><td><code>$9A92</code></td><td><span class="data">data</span></td><td>タイトル: ハイスコア描画用矩形データのヘッダ。</td></tr>
+    <tr><td><code>$9A96</code></td><td><span class="data">data</span></td><td>タイトル画面用パレット。<br>便宜上、矩形データ (32x1) 形式としている。</td></tr>
+    <tr><td><code>$9ABA</code></td><td><span class="data">data</span></td><td>タイトル画面用アトリビュートテーブル。<br>便宜上、矩形データ (64x1) 形式としている。</td></tr>
+    <tr><td><code>$9AFE</code></td><td><span class="code">code</span></td><td>ゲームオーバーシーン。1 人のプレイヤーが残機を全て失った際に呼ばれる。</td></tr>
+    <tr><td><code>$9B70</code></td><td><span class="data">data</span></td><td>ゲームオーバー: "GAME  OVER" の矩形データ。</td></tr>
+    <tr><td><code>$9B7E</code></td><td><span class="data">data</span></td><td>ゲームオーバー画面用パレット。<br>便宜上、矩形データ (32x1) 形式としている。</td></tr>
+    <tr><td><code>$9BA2</code></td><td><span class="data">data</span></td><td>ゲームオーバー画面用アトリビュートテーブル。<br>便宜上、矩形データ (64x1) 形式としている。</td></tr>
+    <tr><td><code>$9BA7</code></td><td><span class="data">data</span></td><td>ゲームオーバー: キーワード描画用矩形データのヘッダ。</td></tr>
+    <tr><td><code>$9BAB</code></td><td><span class="data">data</span></td><td>ゲームオーバー: 特定のスコア条件を満たした際に表示されるキーワードたち。</td></tr>
+    <tr><td><code>$9BCB</code></td><td><span class="code">code</span></td><td><a href="/wave/">wave</a> 進行および壁の更新処理。</td></tr>
+    <tr><td><code>$9D0D</code></td><td><span class="code">code</span></td><td>指定した壁の内部に赤玉があるかどうかを返す。<br><code>$9BCB</code> 下請け。</td></tr>
+    <tr><td><code>$9D57</code></td><td><span class="code">code</span></td><td><a href="/wave/">wave</a> データ参照用ポインタ <code>$1A</code>, オフセット <code>Y</code> の組を 1 進める。<br><code>$9BCB</code> 下請け。</td></tr>
+    <tr><td><code>$9D5D</code></td><td><span class="code">code</span></td><td>壁と穴パターンを指定して対応する盤面セルたちを更新する。<br><code>$9BCB</code> 下請け。</td></tr>
+    <tr><td><code>$9DA3</code></td><td><span class="data">data</span></td><td><a href="/board/">盤面</a>内の各壁の左上隅を指すアドレステーブル。(下位バイト配列, 上位バイト配列) の形式。</td></tr>
+    <tr><td><code>$9E0B</code></td><td><span class="data">data</span></td><td>横壁の穴パターンに対応する盤面セル配列テーブル内オフセットたち。</td></tr>
+    <tr><td><code>$9E13</code></td><td><span class="data">data</span></td><td>横壁の穴パターンに対応する盤面セル配列テーブル。</td></tr>
+    <tr><td><code>$9E3B</code></td><td><span class="data">data</span></td><td>縦壁の穴パターンに対応する盤面セル配列テーブル内オフセットたち。</td></tr>
+    <tr><td><code>$9E43</code></td><td><span class="data">data</span></td><td>縦壁の穴パターンに対応する盤面セル配列テーブル。</td></tr>
+    <tr><td><code>$9E5B</code></td><td><span class="data">data</span></td><td>交点壁の穴パターンに対応する盤面セルテーブル。</td></tr>
+    <tr><td><code>$9E5D</code></td><td><span class="code">code</span></td><td>指定した壁を再描画する (常に非同期)。</td></tr>
+    <tr><td><code>$9E79</code></td><td><span class="code">code</span></td><td>横壁の再描画処理 (常に非同期)。<br><code>$9E5D</code> 下請け。</td></tr>
+    <tr><td><code>$9EAD</code></td><td><span class="data">data</span></td><td>各横壁 (左上から row-major) の左端を指す PPU アドレステーブル。(下位バイト配列, 上位バイト配列) の形式。</td></tr>
+    <tr><td><code>$9ED5</code></td><td><span class="data">data</span></td><td>横壁の穴パターンに対応する壁タイル配列テーブル内オフセットたち。</td></tr>
+    <tr><td><code>$9EDD</code></td><td><span class="data">data</span></td><td>横壁の穴パターンに対応する壁タイル配列テーブル。</td></tr>
+    <tr><td><code>$9F05</code></td><td><span class="code">code</span></td><td>縦壁の再描画処理 (常に非同期)。<br><code>$9E5D</code> 下請け。</td></tr>
+    <tr><td><code>$9F3E</code></td><td><span class="data">data</span></td><td>各縦壁 (左上から row-major) の上端を指す PPU アドレステーブル。(下位バイト配列, 上位バイト配列) の形式。</td></tr>
+    <tr><td><code>$9F5E</code></td><td><span class="data">data</span></td><td>縦壁の穴パターンに対応する壁タイル配列テーブル内オフセットたち。</td></tr>
+    <tr><td><code>$9F66</code></td><td><span class="data">data</span></td><td>縦壁の穴パターンに対応する壁タイル配列テーブル。</td></tr>
+    <tr><td><code>$9F7E</code></td><td><span class="code">code</span></td><td>交点壁の再描画処理 (常に非同期)。<br><code>$9E5D</code> 下請け。</td></tr>
+    <tr><td><code>$9FAA</code></td><td><span class="data">data</span></td><td>各交点壁 (左上から row-major) を指す PPU アドレステーブル。(下位バイト配列, 上位バイト配列) の形式。</td></tr>
+    <tr><td><code>$9FCA</code></td><td><span class="data">data</span></td><td>交点壁の穴パターンに対応する壁タイルテーブル。</td></tr>
+    <tr><td><code>$9FCC</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオドライバ</a>を(再)初期化する。</td></tr>
+    <tr><td><code>$9FEE</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: 指定した<a href="/audio/sound/">効果音</a>を再生要求する。</td></tr>
+    <tr><td><code>$A03F</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: 各<a href="/audio/sound/">効果音</a>の nice 値。</td></tr>
+    <tr><td><code>$A04E</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: 各<a href="/audio/sound/">効果音</a>で使用するチャンネルのマスク。</td></tr>
+    <tr><td><code>$A05D</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: 各<a href="/audio/sound/">効果音</a>バイトコードへのポインタテーブル。(下位バイト配列, 上位バイト配列) の形式。</td></tr>
+    <tr><td><code>$A07B</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: 指定した<a href="/audio/music/">音楽</a>を再生要求する。(<span class="note">NOTE</span>: 実際は常に音楽ID 0 が渡される)</td></tr>
+    <tr><td><code>$A0AF</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: 各<a href="/audio/music/">音楽</a>バイトコードへのポインタテーブル (1 つしかないが)。(下位バイト配列, 上位バイト配列) の形式。</td></tr>
+    <tr><td><code>$A0B1</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオドライバ</a>を tick する。<br>NMI スレッドから呼ばれる。</td></tr>
+    <tr><td><code>$A148</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>の tick 処理。</td></tr>
+    <tr><td><code>$A14D</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: プログラムカウンタをインクリメントし、次の命令を実行する。</td></tr>
+    <tr><td><code>$A153</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: 次の命令を実行する。</td></tr>
+    <tr><td><code>$A15B</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード <code>0x40..=0xFF</code> (矩形波/三角波の発音/消音) の処理。</td></tr>
+    <tr><td><code>$A181</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード分岐 (<code>0..=0x3F</code>)。</td></tr>
+    <tr><td><code>$A187</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード <code>0..=0x1F</code> (ウェイトカウンタ設定) の処理。</td></tr>
+    <tr><td><code>$A18F</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: プログラムカウンタをインクリメントする。</td></tr>
+    <tr><td><code>$A196</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード分岐 (<code>0x20..=0x3F</code>)。</td></tr>
+    <tr><td><code>$A19C</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード <code>0x20..=0x2F</code> (APU レジスタへの書き込み) の処理。</td></tr>
+    <tr><td><code>$A1AF</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード分岐 (<code>0x30..=0x3F</code>)。</td></tr>
+    <tr><td><code>$A1B5</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード <code>0x3F</code> (全ての矩形波/三角波チャンネルを消音) の処理。</td></tr>
+    <tr><td><code>$A1D0</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード分岐 (<code>0x30..=0x3E</code>)。</td></tr>
+    <tr><td><code>$A1D4</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード <code>0x33</code> (ジャンプ) の処理。</td></tr>
+    <tr><td><code>$A1E2</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード分岐 (<code>0x30..=0x32, 0x34..=0x3E</code>)。</td></tr>
+    <tr><td><code>$A1E6</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード <code>0x34</code> (サブルーチン呼び出し) の処理。</td></tr>
+    <tr><td><code>$A20D</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード分岐 (<code>0x30..=0x32, 0x35..=0x3E</code>)。</td></tr>
+    <tr><td><code>$A211</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード <code>0x35</code> (サブルーチンからの復帰) の処理。</td></tr>
+    <tr><td><code>$A224</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード分岐 (<code>0x30..=0x32, 0x36..=0x3E</code>)。</td></tr>
+    <tr><td><code>$A228</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード <code>0x36</code> (n 回のループを開始) の処理。</td></tr>
+    <tr><td><code>$A248</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード分岐 (<code>0x30..=0x32, 0x37..=0x3E</code>)。</td></tr>
+    <tr><td><code>$A24C</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード <code>0x37</code> (ループ継続/終了) の処理。</td></tr>
+    <tr><td><code>$A269</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a>バイトコード: オペコード <code>0x30..=0x32, 0x38..=0x3E</code> (矩形波/三角波の周波数変化) の処理。</td></tr>
+    <tr><td><code>$A291</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>の tick 処理。</td></tr>
+    <tr><td><code>$A29B</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: プログラムカウンタをインクリメントし、次の命令を実行する。</td></tr>
+    <tr><td><code>$A29E</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: 次の命令を実行する。</td></tr>
+    <tr><td><code>$A2A6</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード <code>0x40..=0xFF</code> (矩形波/三角波の発音/消音要求) の処理。</td></tr>
+    <tr><td><code>$A2CB</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード分岐 (<code>0..=0x3F</code>)。</td></tr>
+    <tr><td><code>$A2D1</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード <code>0..=0x1F (ウェイトカウンタ設定) の処理。</code></td></tr>
+    <tr><td><code>$A2D5</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: プログラムカウンタをインクリメントする。</td></tr>
+    <tr><td><code>$A2DC</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード分岐 (<code>0x20..=0x3F</code>)。</td></tr>
+    <tr><td><code>$A2E2</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード <code>0x20..=0x2F</code> (APU レジスタへの書き込み要求) の処理。</td></tr>
+    <tr><td><code>$A2F2</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード分岐 (<code>0x30..=0x3F</code>)。</td></tr>
+    <tr><td><code>$A2F8</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード <code>0x3F</code> (未使用) の処理。</td></tr>
+    <tr><td><code>$A30D</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード分岐 (<code>0x30..=0x3E</code>)。</td></tr>
+    <tr><td><code>$A311</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード <code>0x33</code> (ジャンプ) の処理。</td></tr>
+    <tr><td><code>$A31F</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード分岐 (<code>0x30..=0x32, 0x34..=0x3E</code>)。</td></tr>
+    <tr><td><code>$A323</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード <code>0x34</code> (サブルーチン呼び出し) の処理。</td></tr>
+    <tr><td><code>$A34A</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード分岐 (<code>0x30..=0x32, 0x35..=0x3E</code>)。</td></tr>
+    <tr><td><code>$A34E</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード <code>0x35</code> (サブルーチンからの復帰) の処理。</td></tr>
+    <tr><td><code>$A361</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード分岐 (<code>0x30..=0x32, 0x36..=0x3E</code>)。</td></tr>
+    <tr><td><code>$A365</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード <code>0x36</code> (n 回のループを開始) の処理。</td></tr>
+    <tr><td><code>$A385</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード分岐 (<code>0x30..=0x32, 0x37..=0x3E</code>)。</td></tr>
+    <tr><td><code>$A389</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード <code>0x37</code> (ループ継続/終了) の処理。</td></tr>
+    <tr><td><code>$A3A6</code></td><td><span class="code">code</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a>バイトコード: オペコード <code>0x30..=0x32, 0x38..=0x3E</code> (未使用、実質 nop) の処理。</td></tr>
+    <tr><td><code>$A3AD</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 1 バイトコード (面開始ジングル)。</td></tr>
+    <tr><td><code>$A48C</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/music/">音楽</a> 0 バイトコード。</td></tr>
+    <tr><td><code>$A62F</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 2 バイトコード (面クリアジングル)。</td></tr>
+    <tr><td><code>$A6AB</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 3 バイトコード (ゲームオーバージングル)。</td></tr>
+    <tr><td><code>$A753</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 4, 5 バイトコード (通常玉が 50pts に落下)。</td></tr>
+    <tr><td><code>$A75B</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 6 バイトコード (通常玉が 50pts に落下)。</td></tr>
+    <tr><td><code>$A763</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 7 バイトコード (通常玉が 50pts に落下)。</td></tr>
+    <tr><td><code>$A76B</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 8 バイトコード (通常玉が 50pts に落下)。</td></tr>
+    <tr><td><code>$A773</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 9 バイトコード (カニ警告)。</td></tr>
+    <tr><td><code>$A781</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 10 バイトコード (赤玉が 50pts 以外に落下)。</td></tr>
+    <tr><td><code>$A7C4</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 11 バイトコード (ミス)。</td></tr>
+    <tr><td><code>$A804</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 12 バイトコード (swap 操作)。</td></tr>
+    <tr><td><code>$A839</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 13 バイトコード (ポーズ)。</td></tr>
+    <tr><td><code>$A851</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: <a href="/audio/sound/">効果音</a> 14 バイトコード (通常玉が 50pts 以外に落下)。<br><span class="xxx">バイトコード内のバグにより無音になっている</span> (おそらくノイズ音量を 0 にするつもりで矩形波Aの音量を 0 にしてしまっている)。</td></tr>
+    <tr><td><code>$A864</code></td><td><span class="data">data</span></td><td><a href="/audio/">オーディオ</a>: 周波数タイマー値テーブル (<code>u16be[60]</code>)。<br>12 平均律の F2 から半音ずつ高くなる。末尾は値 0 (消音用)。</td></tr>
+    <tr><td><code>$A8DC-$CEFF</code></td><td></td><td>(空き領域)</td></tr>
+    <tr><td><code>$CF00</code></td><td><span class="data">data</span></td><td>(未使用 <a href="/wave/">wave</a> テーブル)</td></tr>
+    <tr><td><code>$CF03</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> テーブル (ビッグエンディアンのポインタ配列 (0 終端))。</td></tr>
+    <tr><td><code>$CF54</code></td><td><span class="data">data</span></td><td>(未使用 <a href="/wave/">wave</a> データ)</td></tr>
+    <tr><td><code>$D029</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 8, 35 データ。</td></tr>
+    <tr><td><code>$D1F2</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 6, 23, 33 データ。</td></tr>
+    <tr><td><code>$D2A9</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 7 データ。</td></tr>
+    <tr><td><code>$D42E</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 24, 38 データ。</td></tr>
+    <tr><td><code>$D5C7</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 31 データ。</td></tr>
+    <tr><td><code>$D74A</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 10, 26 データ。</td></tr>
+    <tr><td><code>$D90B</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 19 データ。</td></tr>
+    <tr><td><code>$DAD2</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 13, 34 データ。</td></tr>
+    <tr><td><code>$DD11</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 12 データ。</td></tr>
+    <tr><td><code>$DE46</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 29 データ。</td></tr>
+    <tr><td><code>$DFA5</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 21, 32 データ。</td></tr>
+    <tr><td><code>$E1AA</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 22 データ。</td></tr>
+    <tr><td><code>$E375</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 16 データ。</td></tr>
+    <tr><td><code>$E4C2</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 17 データ。</td></tr>
+    <tr><td><code>$E5A1</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 15, 37 データ。</td></tr>
+    <tr><td><code>$E738</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 14, 30 データ。</td></tr>
+    <tr><td><code>$E949</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 0 データ。</td></tr>
+    <tr><td><code>$E9D4</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 1 データ。</td></tr>
+    <tr><td><code>$EBA3</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 2, 27 データ。</td></tr>
+    <tr><td><code>$EDD2</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 3 データ。</td></tr>
+    <tr><td><code>$F031</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 4 データ。<br><span class="xxx">末尾に 2 つの無効エントリがある</span> (wave 内時間 255 に対するエントリと思われるが、実際には終端バイト 0xFF とみなされ、そこで wave が終わる)。</td></tr>
+    <tr><td><code>$F2B2</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 5 データ。</td></tr>
+    <tr><td><code>$F491</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 20, 36 データ。</td></tr>
+    <tr><td><code>$F672</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 28 データ。</td></tr>
+    <tr><td><code>$F829</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 9 データ。</td></tr>
+    <tr><td><code>$FA52</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 11 データ。</td></tr>
+    <tr><td><code>$FBC1</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 18, 39 データ。</td></tr>
+    <tr><td><code>$FE08</code></td><td><span class="data">data</span></td><td><a href="/wave/">wave</a> 25 データ。</td></tr>
+    <tr><td><code>$FFDF-$FFF9</code></td><td></td><td>(空き領域)</td></tr>
+    <tr><td><code>$FFFA-$FFFF</code></td><td><span class="data">data</span></td><td>割り込みベクタ。</td></tr>
+</tbody>
+</table>
+
+<h2>詳細</h2>
+
+<h3 id="PostRectImpl"><code>$8388</code>: 矩形データ転送ルーチン</h3>
+
+<p>PPU へ矩形データ (ベタまたは塗りつぶし) を転送する。レンダリングが有効なら非同期、無効なら同期で転送する。</p>
+
+<h4>引数</h4>
+
+<dl>
+    <dt><code>A</code></dt><dd>塗りつぶしかどうか (0:false, 1:true)。</dd>
+    <dt><code>$0B</code></dt><dd>呼び出し側で退避した <code>A</code> の値。</dd>
+</dl>
+
+<h4>インライン引数</h4>
+
+<dl>
+    <dt><code>ptr</code></dt><dd>矩形データへのポインタ。</dd>
+</dl>
+
+<h4>戻り値</h4>
+
+<dl>
+    <dt><code>A</code></dt><dd>引数 <code>$0B</code> から復元した値。</dd>
+</dl>
+
+<h4>保存</h4>
+
+<p><code>X</code>, <code>Y</code></p>
+
+<h4>説明</h4>
+
+<p><code>$837E</code> (塗りつぶし矩形データ転送ルーチン), <code>$8384</code> (ベタ矩形データ転送ルーチン) の下請け。</p>
+
+<p>ベタ矩形データの形式:</p>
+
+<table>
+<thead><tr><th>型</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><code>u16le</code></td><td>矩形の左上隅に対応する PPU アドレス。</td></tr>
+<tr><td><code>u8</code></td><td>矩形の幅 (タイル単位)。</td></tr>
+<tr><td><code>u8</code></td><td>矩形の高さ (タイル単位)。</td></tr>
+<tr><td><code>u8[]</code></td><td>矩形内のタイル配列。<br><code>(幅) &gt;= (高さ)</code> の場合 row-major, <code>(幅) &lt; (高さ)</code> の場合 column-major</td></tr>
+</tbody>
+</table>
+
+<p>塗りつぶし矩形データの形式:</p>
+
+<table>
+<thead><tr><th>型</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><code>u16le</code></td><td>矩形の左上隅に対応する PPU アドレス。</td></tr>
+<tr><td><code>u8</code></td><td>矩形の幅 (タイル単位)。</td></tr>
+<tr><td><code>u8</code></td><td>矩形の高さ (タイル単位)。</td></tr>
+<tr><td><code>u8</code></td><td>矩形を塗りつぶすタイル。</td></tr>
+</tbody>
+</table>
+
+<p>レンダリングが有効なら非同期、無効なら同期で転送を行う。</p>
+
+<p>矩形の幅/高さに応じて転送方向が変わる:</p>
+
+<ul>
+    <li>横長、即ち <code>(幅) &gt;= (高さ)</code> の場合、<code>$83CC</code> を呼んで横方向転送を行う。</li>
+    <li>縦長、即ち <code>(幅) &lt; (高さ)</code> の場合、<code>$8429</code> を呼んで縦方向転送を行う。</li>
+</ul>
+
+<p><span class="note">NOTE</span>: 「同期かつ縦方向転送かつベタ」の設定で本ルーチンを呼び出すと<span class="xxx">暴走する</span>。ただし、ゲーム内でそのような呼び出しが行われるケースはない。原因は縦方向転送ルーチン <code>$8429</code> 内の分岐命令のオフセットの誤り。</p>
+
+<h3 id="AddScore"><code>$9049</code>: スコア加算ルーチン</h3>
+
+<p>指定されたスコアを加算し、付随する諸々の処理を行う。</p>
+
+<h4>引数</h4>
+
+<dl>
+    <dt><code>A</code></dt>
+    <dd>加算スコア:<ul>
+        <li><code>0..=5</code>: <code>10 * A</code> 点 (ただし、ボーナスタイムの場合 A の値によらず 100 点)。</li>
+        <li>0x80: 5000 点。</li>
+        <li>0x81: 10000 点。</li>
+    </ul></dd>
+</dl>
+
+<h4>戻り値</h4>
+
+<dl>
+    <dt><code>$29</code></dt><dd>呼び出し前の <code>Y</code> の値。</dd>
+</dl>
+
+<h4>保存</h4>
+
+<p><code>A</code>, <code>Y</code></p>
+
+<h4>説明</h4>
+
+<p>現在のプレイヤーのスコアに指定された値を加算し、スコア再描画フラグを立てる。</p>
+
+<p>加算結果がハイスコア以上の値ならばハイスコアを更新し、ハイスコア再描画フラグを立てる。</p>
+
+<p>まだ現在の面の目標スコアを達成しておらず、かつ加算結果が目標スコア以上の値ならばボーナスタイムを開始する。</p>
+
+</body>
+</html>
