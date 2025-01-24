@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>ロットロット (FC) 攻略/解析 - 小ネタ</title>
 
-    <link rel="stylesheet" href="/asset/css/main.css">
+    <link rel="stylesheet" href="../asset/css/main.css">
 </head>
 <body>
 
@@ -16,7 +16,7 @@
 
 <p>本作のメインループは NMI カウンタが奇数ならば多くの処理をスキップする (おそらく NMI スレッドの負荷を考慮した措置)。しかし、NMI カウンタが奇数の場合も swap 操作の処理は行われ、またポーズ中も NMI カウンタは進むので、TAS ならばポーズ連打で時を止めたまま swap 操作だけを行うことができる (<a href="LotLot-PauseTech.zip">movie</a>)。</p>
 
-<p>応用として、ポーズ連打で全ての部屋について再描画フラグを立てることで一部の描画が間に合わないようにもできる (<a href="LotLot-ScreenGlitch.zip">movie</a>: 15 個あるはずの玉が 10 個しか描画されない)。うまくやれば <a href="/ram/#ppu-queue">PPU データ転送キュー</a> を破壊することも可能かもしれないが、これにより描画以外に影響を及ぼすことは困難と思われる。</p>
+<p>応用として、ポーズ連打で全ての部屋について再描画フラグを立てることで一部の描画が間に合わないようにもできる (<a href="LotLot-ScreenGlitch.zip">movie</a>: 15 個あるはずの玉が 10 個しか描画されない)。うまくやれば <a href="../ram/#ppu-queue">PPU データ転送キュー</a> を破壊することも可能かもしれないが、これにより描画以外に影響を及ぼすことは困難と思われる。</p>
 
 </body>
 </html>
